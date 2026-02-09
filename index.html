@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Žij padel – Carousel</title>
+
+  <style>
+    :root{
+      --bg:#003d79;
+      --accent:#c6e801;
+      --text:#ffffff;
+      --muted:rgba(255,255,255,.86);
+      --radius:20px;
+      --shadow:0 10px 28px rgba(0,0,0,.12);
+    }
+
+    html,body{height:100%; margin:0; background:transparent;}
+    body{display:flex; justify-content:center; align-items:flex-start; padding:0;}
+    .wrap{width:100%; max-width:1400px; padding:0;}
+
+    /* Viewport */
+    .viewport{
+      position:relative;
+      width:100%;
+      aspect-ratio:16/6;
+      min-height:440px;
+      border-radius:var(--radius);
+      overflow:hidden;
+      background:var(--bg);
+      box-shadow:var(--shadow);
+    }
+    @media (max-width:1024px){
+      .viewport{aspect-ratio:auto; min-height:unset;}
+    }
+
+    .track{
+      height:100%;
+      display:flex;
+      transition:transform 520ms cubic-bezier(.2,.8,.2,1);
+      will-change:transform;
+    }
+
+    /* jen aktivní slide je klikací */
+    .slide{
+      min-width:100%;
+      height:100%;
+      position:relative;
+      user-select:none;
+      -webkit-user-drag:none;
+      pointer-events:none;
+    }
+    .slide.is-active{pointer-events:auto;}
+
+    /* ===== Banner template ===== */
+    .zp-banner{
+      position:relative;
+      width:100%;
+      height:100%;
+      background:var(--bg);
+      color:var(--text);
+      font-family:"Poppins",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      overflow:hidden; /* pojistka */
+    }
+
+    /* Gradient je jen na banneru (eliminuje seam) */
+    .zp-banner::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:linear-gradient(
+        90deg,
+        var(--bg) 0%,
+        rgba(0,0,0,0) 38%
+      );
+      z-index:1;
+      pointer-events:none;
+    }
+
+    .zp-wrap{
+      display:flex;
+      height:100%;
+      min-height:440px;
+      position:relative; /* ✅ ukotví absolutní .zp-right */
+    }
+
+    .zp-left{
+      width:42%;
+      padding:38px 42px 38px 72px;
+      position:relative;
+      z-index:2;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+
+    .zp-title{
+      margin:0;
+      font-weight:800;
+      line-height:1.05;
+      font-size:clamp(34px,5vw,56px);
+      color:var(--text);
+    }
+
+    .zp-lead{
+      margin:0;
+      font-size:clamp(16px,2.2vw,22px);
+      color:var(--muted);
+      font-weight:600;
+      white-space:nowrap;
+    }
+
+    .zp-cta{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+
+    .zp-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      background:var(--accent);
+      color:var(--bg);
+      border:none;
+      border-radius:14px;
+      padding:14px 20px;
+      font-weight:800;
+      font-size:18px;
+      text-decoration:none;
+      box-shadow:0 6px 16px rgba(198,232,1,.35);
+      transition:transform .18s ease;
+    }
+    .zp-btn:hover,.zp-btn:focus-visible{
+      transform:scale(1.03);
+      outline:3px solid rgba(198,232,1,.6);
+      outline-offset:2px;
+    }
+
+    /* Pravý blok absolutně (desktop/tablet) */
+    .zp-right{
+      position:absolute;
+      top:0;
+      right:0;
+      bottom:0;
+      width:58%;
+      background:var(--bg);
+      z-index:0; /* pod gradientem a textem */
+      overflow:hidden;
+    }
+
+    .hero{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      object-position:var(--focus-x,60%) var(--focus-y,40%);
+      display:block;
+      filter:saturate(1.05) contrast(1.05);
+      z-index:0;
+    }
+
+    .zp-accent{color:var(--accent);}
+
+    /* Mobil */
+    @media (max-width:1024px){
+      .zp-wrap{
+        flex-direction:column;
+        min-height:unset;
+        height:auto;
+      }
+      .zp-left{
+        width:100%;
+        padding:20px 20px 12px;
+      }
+      .zp-lead{white-space:normal;}
+
+      /* ✅ zrušení absolutní pozice */
+      .zp-right{
+        position:relative;
+        top:auto; right:auto; bottom:auto; left:auto;
+        width:100%;
+        aspect-ratio:16/10;
+        min-height:320px;
+      }
+
+      .hero{
+        object-position:var(--focus-x,60%) var(--focus-y-mobile,40%);
+      }
+
+      /* Gradient na mobilu shora dolů */
+      .zp-banner::after{
+        background:linear-gradient(
+          180deg,
+          var(--bg) 0%,
+          rgba(0,0,0,0) 16%
+        );
+      }
+    }
+
+    /* Arrows (desktop) */
+    .btn{
+      position:absolute;
+      top:50%;
+      transform:translateY(-50%);
+      width:42px;
+      height:42px;
+      border:none;
+      border-radius:999px;
+      background:rgba(255,255,255,.92);
+      color:#111;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      box-shadow:0 8px 18px rgba(0,0,0,.18);
+      z-index:30;
+      transition:opacity .18s ease;
+    }
+    .btn.prev{left:12px;}
+    .btn.next{right:12px;}
+
+    @media (max-width:1024px){
+      .btn{display:none !important;}
+    }
+
+    /* skrýt šipky při hover/focus CTA */
+    .viewport.cta-hover .btn{
+      opacity:0;
+      pointer-events:none;
+    }
+
+    /* Dots */
+    .dots{
+      position:absolute;
+      left:50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      display:flex;
+      gap:10px;
+      z-index:40;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,.28);
+      backdrop-filter:blur(6px);
+    }
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.7);
+      background:transparent;
+      cursor:pointer;
+      transition:transform .15s ease, background .15s ease;
+    }
+    .dot[aria-current="true"]{
+      background:var(--accent);
+      border-color:var(--accent);
+    }
+    .dot:hover{transform:scale(1.15);}
+
+    @media (prefers-reduced-motion: reduce){
+      .track,.btn,.dot{transition:none!important;}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="carousel" role="region" aria-label="Žij padel – karusel bannerů">
+    <div class="viewport" id="viewport">
+      <div class="track" id="track"></div>
+
+      <button class="btn prev" type="button" id="prev" aria-label="Předchozí banner">‹</button>
+      <button class="btn next" type="button" id="next" aria-label="Další banner">›</button>
+
+      <div class="dots" id="dots" aria-label="Indikátor bannerů"></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    const track = $("#track");
+    const viewport = $("#viewport");
+    const prevBtn = $("#prev");
+    const nextBtn = $("#next");
+    const dotsWrap = $("#dots");
+
+    const AUTOPLAY_MS = 5000;
+
+    let data = [];
+    let index = 0;
+    let timer = null;
+
+    const esc = (s="") => String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#39;");
+
+    function buildUrlWithUtm(href, utm){
+      if(!utm) return href;
+      try{
+        const u = new URL(href);
+        if(utm.source)   u.searchParams.set("utm_source", utm.source);
+        if(utm.medium)   u.searchParams.set("utm_medium", utm.medium);
+        if(utm.campaign) u.searchParams.set("utm_campaign", utm.campaign);
+        if(utm.content)  u.searchParams.set("utm_content", utm.content);
+        if(utm.term)     u.searchParams.set("utm_term", utm.term);
+        return u.toString();
+      }catch(e){
+        return href;
+      }
+    }
+
+    function cssVarsFromTheme(theme){
+      const t = theme || {};
+      const out = [];
+      if(t.bg)     out.push(`--bg:${t.bg}`);
+      if(t.accent) out.push(`--accent:${t.accent}`);
+      if(t.text)   out.push(`--text:${t.text}`);
+      if(t.muted)  out.push(`--muted:${t.muted}`);
+      return out.join(";");
+    }
+
+    function titleHtml(content){
+      if(!content) return "";
+      if(Array.isArray(content.titleLines) && content.titleLines.length){
+        // titleLines může obsahovat HTML
+        return content.titleLines.join("<br>");
+      }
+      if(typeof content.titleHtml === "string" && content.titleHtml.trim()){
+        return content.titleHtml.replaceAll("\n","<br>");
+      }
+      if(typeof content.titleText === "string"){
+        return esc(content.titleText).replaceAll("\n","<br>");
+      }
+      return "";
+    }
+
+    function leadHtml(content){
+      if(!content) return "";
+      if(Array.isArray(content.leadLines) && content.leadLines.length){
+        // lead escape
+        return content.leadLines.map(esc).join("<br>");
+      }
+      if(typeof content.leadText === "string"){
+        return esc(content.leadText).replaceAll("\n","<br>");
+      }
+      return "";
+    }
+
+    function renderSlide(b){
+      const vars = cssVarsFromTheme(b?.theme);
+      const t = titleHtml(b?.content);
+      const l = leadHtml(b?.content);
+
+      const href = buildUrlWithUtm(b?.cta?.href || "#", b?.cta?.utm);
+      const ctaLabel = b?.cta?.label || "Zobrazit";
+      const ctaSuffix = b?.cta?.suffix ? ` <span aria-hidden="true">${esc(b.cta.suffix)}</span>` : "";
+      const ctaAria = b?.cta?.aria || ctaLabel;
+      const target = b?.cta?.target || "_top";
+
+      const imgSrc = b?.image?.src || "";
+      const imgAlt = b?.image?.alt || "";
+
+      const fx  = b?.image?.focus?.desktop?.x || "60%";
+      const fy  = b?.image?.focus?.desktop?.y || "40%";
+      const fym = b?.image?.focus?.mobile?.y  || "40%";
+
+      return `
+        <div class="slide" style="${esc(vars)}">
+          <section class="zp-banner" role="region" aria-label="${esc(b?.id || "banner")}">
+            <div class="zp-wrap" style="--focus-x:${esc(fx)};--focus-y:${esc(fy)};--focus-y-mobile:${esc(fym)};">
+              <div class="zp-left">
+                <h1 class="zp-title">${t}</h1>
+                <p class="zp-lead">${l}</p>
+                <div class="zp-cta">
+                  <a class="zp-btn"
+                     href="${esc(href)}"
+                     target="${esc(target)}"
+                     aria-label="${esc(ctaAria)}"
+                     data-cta="true">
+                    ${esc(ctaLabel)}${ctaSuffix}
+                  </a>
+                </div>
+              </div>
+
+              <div class="zp-right" aria-hidden="true">
+                <img class="hero" src="${esc(imgSrc)}" alt="${esc(imgAlt)}" decoding="async" loading="eager">
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function setDots(){
+      $$(".dot", dotsWrap).forEach((d,i) => d.setAttribute("aria-current", i === index ? "true" : "false"));
+    }
+
+    function setActive(){
+      $$(".slide", track).forEach((s,i) => s.classList.toggle("is-active", i === index));
+    }
+
+    function go(i, userAction=false){
+      const count = data.length || 1;
+      index = (i + count) % count;
+
+      track.style.transform = `translateX(${-index * 100}%)`;
+      setActive();
+      setDots();
+
+      if(userAction) restartAutoplay();
+    }
+
+    function stopAutoplay(){
+      if(timer) clearInterval(timer);
+      timer = null;
+    }
+    function startAutoplay(){
+      stopAutoplay();
+      if(data.length > 1) timer = setInterval(() => go(index + 1), AUTOPLAY_MS);
+    }
+    function restartAutoplay(){ startAutoplay(); }
+
+    function bindCtaHover(){
+      const on = () => viewport.classList.add("cta-hover");
+      const off = () => viewport.classList.remove("cta-hover");
+
+      viewport.addEventListener("mouseover", (e) => {
+        if(e.target.closest && e.target.closest('a[data-cta="true"]')) on();
+      });
+      viewport.addEventListener("mouseout", (e) => {
+        if(e.target.closest && e.target.closest('a[data-cta="true"]')) off();
+      });
+      viewport.addEventListener("focusin", (e) => {
+        if(e.target.closest && e.target.closest('a[data-cta="true"]')) on();
+      });
+      viewport.addEventListener("focusout", (e) => {
+        if(e.target.closest && e.target.closest('a[data-cta="true"]')) off();
+      });
+    }
+
+    function bindSwipe(){
+      let startX = 0, dx = 0, dragging = false;
+
+      track.addEventListener("touchstart", (e) => {
+        if(data.length <= 1) return;
+        dragging = true;
+        startX = e.touches[0].clientX;
+        dx = 0;
+        stopAutoplay();
+      }, {passive:true});
+
+      track.addEventListener("touchmove", (e) => {
+        if(!dragging) return;
+        dx = e.touches[0].clientX - startX;
+      }, {passive:true});
+
+      track.addEventListener("touchend", () => {
+        if(!dragging) return;
+        dragging = false;
+        if(Math.abs(dx) > 50) go(index + (dx < 0 ? 1 : -1), true);
+        else restartAutoplay();
+      });
+    }
+
+    function bindHoverPause(){
+      viewport.addEventListener("mouseenter", stopAutoplay);
+      viewport.addEventListener("mouseleave", startAutoplay);
+    }
+
+    function bindArrows(){
+      prevBtn.addEventListener("click", () => go(index - 1, true));
+      nextBtn.addEventListener("click", () => go(index + 1, true));
+    }
+
+    function buildDots(){
+      dotsWrap.innerHTML = "";
+      data.forEach((_, i) => {
+        const btn = document.createElement("button");
+        btn.className = "dot";
+        btn.type = "button";
+        btn.setAttribute("aria-label", `Banner ${i+1} z ${data.length}`);
+        btn.addEventListener("click", () => go(i, true));
+        dotsWrap.appendChild(btn);
+      });
+    }
+
+    function toggleControls(){
+      const hasMany = data.length > 1;
+      prevBtn.style.display = hasMany ? "" : "none";
+      nextBtn.style.display = hasMany ? "" : "none";
+      dotsWrap.style.display = hasMany ? "flex" : "none";
+    }
+
+    async function init(){
+      const res = await fetch("./banners/banners.json", {cache:"no-store"});
+      data = await res.json();
+
+      track.innerHTML = data.map(renderSlide).join("");
+
+      buildDots();
+      toggleControls();
+
+      bindArrows();
+      bindSwipe();
+      bindHoverPause();
+      bindCtaHover();
+
+      go(0);
+      startAutoplay();
+    }
+
+    init().catch(err => console.error("Carousel init failed:", err));
+  </script>
+</body>
+</html>
