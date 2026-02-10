@@ -10,7 +10,7 @@
         "layout": {
             "leftWidth": "42%",
             "rightWidth": "58%",
-            "leftPaddingDesktop": "140px 42px 38px 72px",
+            "leftPaddingDesktop": "120px 42px 38px 72px",
             "leftPaddingMobile": "20px 20px 12px",
             "gradientDesktopStop": "30%",
             "gradientMobileStop": "30%"
