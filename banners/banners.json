@@ -21,7 +21,7 @@
                 "<span class=\"zp-accent\">raketu</span> na míru."
             ],
             "leadLines": [
-                "Zdarma • bez registrace.",
+                "Zdarma • bez registrace",
                 "Za 2 minuty ⏱️"
             ]
         },
@@ -75,8 +75,8 @@
                 "<span class=\"zp-accent\">Babolat</span> 2026"
             ],
             "leadLines": [
-                "Exploze síly • rychlé • přesné",
-                "Vyber si svou a zapni Babolat mode."
+                "Exploze síly • rychlé • přesné.",
+                "Vyber si svou a zapni Babolat mode!"
             ]
         },
         "cta": {
@@ -93,7 +93,7 @@
             }
         },
         "image": {
-            "src": "https://www.zijpadel.cz/user/documents/upload/bannery/zijpadel-babolat-kolekce-2026-zijpadel-v2.jpg",
+            "src": "https://www.zijpadel.cz/user/documents/upload/bannery/zijpadel-babolat-kolekce-2026-zijpadel-v3.jpg",
             "alt": "Nová kolekce Babolat – banner Žij padel.",
             "focus": {
                 "desktop": {
