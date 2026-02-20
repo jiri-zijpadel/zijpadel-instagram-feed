@@ -2,7 +2,7 @@ name: Update Instagram Feed
 
 on:
   schedule:
-    - cron: "0 * * * *"  # každou hodinu
+    - cron: "0 * * * *"   # každou hodinu
   workflow_dispatch:
 
 jobs:
@@ -15,11 +15,12 @@ jobs:
 
       - name: Fetch Instagram Data
         run: |
-          curl -s "https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${{ secrets.IG_TOKEN }}&limit=20" > raw.json
+          curl -s "https://graph.facebook.com/v25.0/17841477970120373/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${{ secrets.IG_TOKEN }}&limit=20" > raw.json
 
           node <<'EOF'
           const fs = require("fs");
           const raw = JSON.parse(fs.readFileSync("raw.json","utf8"));
+
           const reels = (raw.data || [])
             .filter(x => x.media_type === "VIDEO")
             .slice(0,6)
