@@ -16,37 +16,58 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Fetch Instagram Profile + Feed
+      - name: Fetch Instagram Profile + Feed (with fallback)
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_ID: "17841477970120373"
         run: |
           set -euo pipefail
 
-          # 1) Profil (počty + username + avatar)
+          echo "Fetching profile..."
           curl -sS "https://graph.facebook.com/v25.0/${IG_ID}?fields=id,username,profile_picture_url,followers_count,follows_count,media_count&access_token=${IG_TOKEN}" > profile.json
 
-          # 2) Feed (mix všeho). limit si uprav dle potřeby
-          curl -sS "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=50&access_token=${IG_TOKEN}" > feed.json
+          echo "Fetching feed with like_count + comments_count..."
+          curl -sS "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count&limit=50&access_token=${IG_TOKEN}" > feed.json
 
           node <<'EOF'
           const fs = require("fs");
 
           const profile = JSON.parse(fs.readFileSync("profile.json","utf8"));
-          const feed = JSON.parse(fs.readFileSync("feed.json","utf8"));
+          let feed = JSON.parse(fs.readFileSync("feed.json","utf8"));
 
-          // fail fast pokud Graph vrací error
-          if (profile.error) { console.error("Profile error:", profile.error); process.exit(1); }
-          if (feed.error)    { console.error("Feed error:", feed.error); process.exit(1); }
+          if (profile.error) {
+            console.error("Profile error:", profile.error);
+            process.exit(1);
+          }
+
+          // === FEED FALLBACK ===
+          if (feed.error) {
+            console.warn("Primary feed request failed. Retrying without like/comment fields...");
+
+            const { execSync } = require("child_process");
+
+            execSync(
+              `curl -sS "https://graph.facebook.com/v25.0/${process.env.IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=50&access_token=${process.env.IG_TOKEN}" > feed.json`
+            );
+
+            feed = JSON.parse(fs.readFileSync("feed.json","utf8"));
+
+            if (feed.error) {
+              console.error("Fallback feed also failed:", feed.error);
+              process.exit(1);
+            }
+          }
 
           const items = (feed.data || []).map(x => ({
             id: x.id,
             caption: x.caption || "",
-            media_type: x.media_type,                 // IMAGE | VIDEO | CAROUSEL_ALBUM
+            media_type: x.media_type,
             media_url: x.media_url || "",
-            thumbnail_url: x.thumbnail_url || "",     // pro VIDEO často existuje
+            thumbnail_url: x.thumbnail_url || "",
             permalink: x.permalink || "",
-            timestamp: x.timestamp || ""
+            timestamp: x.timestamp || "",
+            like_count: typeof x.like_count === "number" ? x.like_count : null,
+            comments_count: typeof x.comments_count === "number" ? x.comments_count : null
           }));
 
           const out = {
@@ -57,13 +78,13 @@ jobs:
               profile_picture_url: profile.profile_picture_url || "",
               posts: profile.media_count ?? null,
               followers: profile.followers_count ?? null,
-              following: profile.follows_count ?? null  // někdy nebude -> null
+              following: profile.follows_count ?? null
             },
             items
           };
 
           fs.writeFileSync("data.json", JSON.stringify(out, null, 2));
-          console.log("Wrote data.json:", { items: items.length, profile: out.profile });
+          console.log("Wrote data.json:", { items: items.length });
           EOF
 
       - name: Commit changes
