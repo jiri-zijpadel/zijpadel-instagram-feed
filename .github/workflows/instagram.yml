@@ -16,58 +16,62 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Fetch Instagram Data
+      - name: Fetch Instagram Profile + Feed
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_ID: "17841477970120373"
         run: |
           set -euo pipefail
 
-          echo "IG_TOKEN length: ${#IG_TOKEN}"
+          # 1) Profil (počty + username + avatar)
+          curl -sS "https://graph.facebook.com/v25.0/${IG_ID}?fields=id,username,profile_picture_url,followers_count,follows_count,media_count&access_token=${IG_TOKEN}" > profile.json
 
-          curl -sS "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=20&access_token=${IG_TOKEN}" > raw.json
+          # 2) Feed (mix všeho). limit si uprav dle potřeby
+          curl -sS "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=50&access_token=${IG_TOKEN}" > feed.json
 
           node <<'EOF'
           const fs = require("fs");
 
-          const rawText = fs.readFileSync("raw.json", "utf8");
-          const raw = JSON.parse(rawText);
+          const profile = JSON.parse(fs.readFileSync("profile.json","utf8"));
+          const feed = JSON.parse(fs.readFileSync("feed.json","utf8"));
 
-          if (raw.error) {
-            console.error("Graph API error:", raw.error);
-            process.exit(1);
-          }
+          // fail fast pokud Graph vrací error
+          if (profile.error) { console.error("Profile error:", profile.error); process.exit(1); }
+          if (feed.error)    { console.error("Feed error:", feed.error); process.exit(1); }
 
-          const reels = (raw.data || [])
-            .filter(x => x.media_type === "VIDEO")
-            .slice(0, 6)
-            .map(x => ({
-              id: x.id,
-              caption: x.caption || "",
-              permalink: x.permalink,
-              thumbnail: x.thumbnail_url || x.media_url,
-              media_url: x.media_url,
-              timestamp: x.timestamp
-            }));
+          const items = (feed.data || []).map(x => ({
+            id: x.id,
+            caption: x.caption || "",
+            media_type: x.media_type,                 // IMAGE | VIDEO | CAROUSEL_ALBUM
+            media_url: x.media_url || "",
+            thumbnail_url: x.thumbnail_url || "",     // pro VIDEO často existuje
+            permalink: x.permalink || "",
+            timestamp: x.timestamp || ""
+          }));
 
-          fs.writeFileSync("data.json", JSON.stringify({ reels }, null, 2));
-          console.log("Wrote data.json with", reels.length, "items");
+          const out = {
+            updated_at: new Date().toISOString(),
+            profile: {
+              id: profile.id,
+              username: profile.username,
+              profile_picture_url: profile.profile_picture_url || "",
+              posts: profile.media_count ?? null,
+              followers: profile.followers_count ?? null,
+              following: profile.follows_count ?? null  // někdy nebude -> null
+            },
+            items
+          };
+
+          fs.writeFileSync("data.json", JSON.stringify(out, null, 2));
+          console.log("Wrote data.json:", { items: items.length, profile: out.profile });
           EOF
-
-          ls -la
-          echo "data.json preview:"
-          head -n 50 data.json || true
 
       - name: Commit changes
         run: |
           set -e
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-
           git add data.json
-
-          # Pokud se nic nezměnilo, nefailni job
           git diff --cached --quiet && { echo "No changes"; exit 0; }
-
           git commit -m "Update Instagram feed"
           git push
