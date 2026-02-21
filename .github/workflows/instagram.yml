@@ -2,7 +2,7 @@ name: Update Instagram Feed
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 */6 * * *"   # každých 6 hodin
   workflow_dispatch:
 
 permissions:
@@ -11,22 +11,26 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Fetch Instagram Data
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_ID: "17841477970120373"
         run: |
           set -euo pipefail
 
-          curl -sS "https://graph.facebook.com/v25.0/17841477970120373/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${{ secrets.IG_TOKEN }}&limit=20" > raw.json
+          echo "IG_TOKEN length: ${#IG_TOKEN}"
 
-          echo "RAW response:"
-          head -c 400 raw.json || true
-          echo
+          curl -sS "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=20&access_token=${IG_TOKEN}" > raw.json
 
           node <<'EOF'
           const fs = require("fs");
-          const rawText = fs.readFileSync("raw.json","utf8");
+
+          const rawText = fs.readFileSync("raw.json", "utf8");
           const raw = JSON.parse(rawText);
 
           if (raw.error) {
@@ -36,11 +40,13 @@ jobs:
 
           const reels = (raw.data || [])
             .filter(x => x.media_type === "VIDEO")
-            .slice(0,6)
+            .slice(0, 6)
             .map(x => ({
+              id: x.id,
               caption: x.caption || "",
               permalink: x.permalink,
               thumbnail: x.thumbnail_url || x.media_url,
+              media_url: x.media_url,
               timestamp: x.timestamp
             }));
 
@@ -49,13 +55,19 @@ jobs:
           EOF
 
           ls -la
+          echo "data.json preview:"
+          head -n 50 data.json || true
 
       - name: Commit changes
         run: |
           set -e
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
           git add data.json
-          git status
-          git commit -m "Update Instagram feed" || echo "No changes"
+
+          # Pokud se nic nezměnilo, nefailni job
+          git diff --cached --quiet && { echo "No changes"; exit 0; }
+
+          git commit -m "Update Instagram feed"
           git push
