@@ -1,0 +1,47 @@
+name: Refresh Instagram Token
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"   # každý měsíc
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Refresh token
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: |
+          set -e
+
+          curl --http1.1 -sS \
+          "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_TOKEN}" \
+          > response.json
+
+          echo "Response:"
+          cat response.json
+
+          node <<'EOF'
+          const fs = require("fs");
+
+          const data = JSON.parse(fs.readFileSync("response.json","utf8"));
+
+          if (!data.access_token) {
+            console.error("Token refresh failed:", data);
+            process.exit(1);
+          }
+
+          fs.writeFileSync("token.txt", data.access_token);
+          console.log("New token generated.");
+          EOF
+
+      - name: Install GitHub CLI
+        run: sudo apt-get install gh -y
+
+      - name: Update repository secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh secret set IG_TOKEN < token.txt
