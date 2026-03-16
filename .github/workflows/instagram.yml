@@ -24,38 +24,50 @@ jobs:
           set -euo pipefail
 
           echo "Fetching profile..."
-          curl -s "https://graph.facebook.com/v25.0/${IG_ID}?fields=id,username,profile_picture_url,followers_count,follows_count,media_count&access_token=${IG_TOKEN}" > profile.json
+          curl --http1.1 -fLsS --retry 3 --retry-delay 5 \
+            "https://graph.facebook.com/v25.0/${IG_ID}?fields=id,username,profile_picture_url,followers_count,follows_count,media_count&access_token=${IG_TOKEN}" \
+            -o profile.json
 
           echo "Fetching feed with like_count + comments_count..."
-          curl -s "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count&limit=50&access_token=${IG_TOKEN}" > feed.json
+          if ! curl --http1.1 -fLsS --retry 3 --retry-delay 5 \
+            "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count&limit=50&access_token=${IG_TOKEN}" \
+            -o feed.json; then
+            echo "Primary feed request failed, trying fallback..."
+            curl --http1.1 -fLsS --retry 3 --retry-delay 5 \
+              "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=50&access_token=${IG_TOKEN}" \
+              -o feed.json
+          fi
+
+          echo "Profile response:"
+          cat profile.json
+          echo
+          echo "Feed response:"
+          cat feed.json
+          echo
 
           node <<'EOF'
           const fs = require("fs");
 
-          const profile = JSON.parse(fs.readFileSync("profile.json","utf8"));
-          let feed = JSON.parse(fs.readFileSync("feed.json","utf8"));
+          function readJson(path) {
+            try {
+              return JSON.parse(fs.readFileSync(path, "utf8"));
+            } catch (e) {
+              console.error(`Invalid JSON in ${path}`);
+              throw e;
+            }
+          }
+
+          const profile = readJson("profile.json");
+          const feed = readJson("feed.json");
 
           if (profile.error) {
-            console.error("Profile error:", profile.error);
+            console.error("Profile error:", JSON.stringify(profile.error, null, 2));
             process.exit(1);
           }
 
-          // === FEED FALLBACK ===
           if (feed.error) {
-            console.warn("Primary feed request failed. Retrying without like/comment fields...");
-
-            const { execSync } = require("child_process");
-
-            execSync(
-              `curl -sS "https://graph.facebook.com/v25.0/${process.env.IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&limit=50&access_token=${process.env.IG_TOKEN}" > feed.json`
-            );
-
-            feed = JSON.parse(fs.readFileSync("feed.json","utf8"));
-
-            if (feed.error) {
-              console.error("Fallback feed also failed:", feed.error);
-              process.exit(1);
-            }
+            console.error("Feed error:", JSON.stringify(feed.error, null, 2));
+            process.exit(1);
           }
 
           const items = (feed.data || []).map(x => ({
