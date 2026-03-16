@@ -24,10 +24,10 @@ jobs:
           set -euo pipefail
 
           echo "Fetching profile..."
-          curl --http1.1 -sL "https://graph.facebook.com/v25.0/${IG_ID}?fields=id,username,profile_picture_url,followers_count,follows_count,media_count&access_token=${IG_TOKEN}" > profile.json
+          curl -s "https://graph.facebook.com/v25.0/${IG_ID}?fields=id,username,profile_picture_url,followers_count,follows_count,media_count&access_token=${IG_TOKEN}" > profile.json
 
           echo "Fetching feed with like_count + comments_count..."
-          curl --http1.1 -sL  "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count&limit=50&access_token=${IG_TOKEN}" > feed.json
+          curl -s "https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count&limit=50&access_token=${IG_TOKEN}" > feed.json
 
           node <<'EOF'
           const fs = require("fs");
