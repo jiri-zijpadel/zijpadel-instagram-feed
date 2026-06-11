@@ -97,7 +97,7 @@
 
   <script>
   (function(){
-    const DATA_URL="https://cdn.jsdelivr.net/gh/jiri-zijpadel/zijpadel-instagram-feed@main/data.json";
+    const DATA_URL = "data.json";
     const FOLLOW_URL="https://www.instagram.com/zijpadel_cz/";
     const FALLBACK_AVATAR="https://via.placeholder.com/96x96.png?text=ZP";
     const MAX_ITEMS=6;
@@ -134,7 +134,7 @@
     const bubbleSvg='<svg class="zp-ig-hover-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 3H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3.6l3.9 3.1c.7.55 1.5.05 1.5-.8V19H20a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>';
 
     async function load(){
-      const res=await fetch(DATA_URL,{cache:"force-cache"});
+      const res = await fetch(DATA_URL + "?v=" + Date.now(), { cache: "no-store" });
       if(!res.ok) throw new Error("Failed to load data.json");
       const json=await res.json();
 
